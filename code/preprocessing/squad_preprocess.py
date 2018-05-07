@@ -1,17 +1,3 @@
-# Copyright 2018 Stanford University
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Downloads SQuAD train and dev sets, preprocesses and writes tokenized versions to file"""
 
 import os
@@ -25,9 +11,6 @@ from tqdm import tqdm
 from six.moves.urllib.request import urlretrieve
 from importlib import reload
 
-
-reload(sys)
-#sys.setdefaultencoding('utf8')
 random.seed(42)
 np.random.seed(42)
 
@@ -73,14 +56,6 @@ def reporthook(t):
     last_b = [0]
 
     def inner(b=1, bsize=1, tsize=None):
-        """
-        b: int, optional
-            Number of blocks just transferred [default: 1].
-        bsize: int, optional
-            Size of each block (in tqdm units) [default: 1].
-        tsize: int, optional
-            Total size (in tqdm units). If [default: None] remains unchanged.
-        """
         if tsize is not None:
             t.total = tsize
         t.update((b - last_b[0]) * bsize)
@@ -103,7 +78,6 @@ def maybe_download(url, filename, prefix, num_bytes=None):
             print ("An error occurred when downloading the file! Please get the dataset using a browser.")
             raise e
     # We have a downloaded file
-    # Check the stats and make sure they are ok
     file_stats = os.stat(os.path.join(prefix, filename))
     if num_bytes is None or file_stats.st_size == num_bytes:
         print ("File {} successfully loaded".format(filename))
@@ -129,19 +103,19 @@ def get_char_word_loc_mapping(context, context_tokens):
         e.g. if context = "hello world" and context_tokens = ["hello", "world"] then
         0,1,2,3,4 are mapped to ("hello", 0) and 6,7,8,9,10 are mapped to ("world", 1)
     """
-    acc = '' # accumulator
-    current_token_idx = 0 # current word loc
+    acc = '' 
+    current_token_idx = 0
     mapping = dict()
 
-    for char_idx, char in enumerate(context): # step through original characters
-        if char != u' ' and char != u'\n': # if it's not a space:
-            acc += char # add to accumulator
-            context_token = str(context_tokens[current_token_idx]) # current word token
-            if acc == context_token: # if the accumulator now matches the current word token
-                syn_start = char_idx - len(acc) + 1 # char loc of the start of this word
+    for char_idx, char in enumerate(context):
+        if char != u' ' and char != u'\n':
+            acc += char
+            context_token = str(context_tokens[current_token_idx]) 
+            if acc == context_token: 
+                syn_start = char_idx - len(acc) + 1 
                 for char_loc in range(syn_start, char_idx+1):
-                    mapping[char_loc] = (acc, current_token_idx) # add to mapping
-                acc = '' # reset accumulator
+                    mapping[char_loc] = (acc, current_token_idx)
+                acc = '' 
                 current_token_idx += 1
 
     if current_token_idx != len(context_tokens):
@@ -153,21 +127,9 @@ def get_char_word_loc_mapping(context, context_tokens):
 def preprocess_and_write(dataset, tier, out_dir):
     """Reads the dataset, extracts context, question, answer, tokenizes them,
     and calculates answer span in terms of token indices.
-    Note: due to tokenization issues, and the fact that the original answer
-    spans are given in terms of characters, some examples are discarded because
-    we cannot get a clean span in terms of tokens.
-
-    This function produces the {train/dev}.{context/question/answer/span} files.
-
-    Inputs:
-      dataset: read from JSON
-      tier: string ("train" or "dev")
-      out_dir: directory to write the preprocessed files
-    Returns:
-      the number of (context, question, answer) triples written to file by the dataset.
     """
 
-    num_exs = 0 # number of examples written to file
+    num_exs = 0 
     num_mappingprob, num_tokenprob, num_spanalignprob = 0, 0, 0
     examples = []
 
@@ -176,57 +138,49 @@ def preprocess_and_write(dataset, tier, out_dir):
         article_paragraphs = dataset['data'][articles_id]['paragraphs']
         for pid in range(len(article_paragraphs)):
 
-            context = str(article_paragraphs[pid]['context']) # string
+            context = str(article_paragraphs[pid]['context']) 
 
-            # The following replacements are suggested in the paper
-            # BidAF (Seo et al., 2016)
             context = context.replace("''", '" ')
             context = context.replace("``", '" ')
 
-            context_tokens = tokenize(context) # list of strings (lowercase)
+            context_tokens = tokenize(context) 
             context = context.lower()
 
-            qas = article_paragraphs[pid]['qas'] # list of questions
+            qas = article_paragraphs[pid]['qas'] 
 
-            charloc2wordloc = get_char_word_loc_mapping(context, context_tokens) # charloc2wordloc maps the character location (int) of a context token to a pair giving (word (string), word loc (int)) of that token
+            charloc2wordloc = get_char_word_loc_mapping(context, context_tokens) 
 
-            if charloc2wordloc is None: # there was a problem
+            if charloc2wordloc is None:
                 num_mappingprob += len(qas)
-                continue # skip this context example
+                continue 
 
             # for each question, process the question and answer and write to file
             for qn in qas:
 
                 # read the question text and tokenize
                 question = str(qn['question']) # string
-                question_tokens = list(tokenize(question)) # list of strings
+                question_tokens = list(tokenize(question))
 
                 # of the three answers, just take the first
-                ans_text = str(qn['answers'][0]['text']).lower() # get the answer text
-                ans_start_charloc = qn['answers'][0]['answer_start'] # answer start loc (character count)
-                ans_end_charloc = ans_start_charloc + len(ans_text) # answer end loc (character count) (exclusive)
+                ans_text = str(qn['answers'][0]['text']).lower()
+                ans_start_charloc = qn['answers'][0]['answer_start']
+                ans_end_charloc = ans_start_charloc + len(ans_text)
 
                 # Check that the provided character spans match the provided answer text
                 if context[ans_start_charloc:ans_end_charloc] != ans_text:
-                  # Sometimes this is misaligned, mostly because "narrow builds" of Python 2 interpret certain Unicode characters to have length 2 https://stackoverflow.com/questions/29109944/python-returns-length-of-2-for-single-unicode-character-string
-                  # We should upgrade to Python 3 next year!
                   num_spanalignprob += 1
                   continue
 
                 # get word locs for answer start and end (inclusive)
-                ans_start_wordloc = charloc2wordloc[ans_start_charloc][1] # answer start word loc
-                ans_end_wordloc = charloc2wordloc[ans_end_charloc-1][1] # answer end word loc
+                ans_start_wordloc = charloc2wordloc[ans_start_charloc][1] 
+                ans_end_wordloc = charloc2wordloc[ans_end_charloc-1][1] 
                 assert ans_start_wordloc <= ans_end_wordloc
 
                 # Check retrieved answer tokens match the provided answer text.
-                # Sometimes they won't match, e.g. if the context contains the phrase "fifth-generation"
-                # and the answer character span is around "generation",
-                # but the tokenizer regards "fifth-generation" as a single token.
-                # Then ans_tokens has "fifth-generation" but the ans_text is "generation", which doesn't match.
                 ans_tokens = context_tokens[ans_start_wordloc:ans_end_wordloc+1]
                 if "".join(ans_tokens) != "".join(ans_text.split()):
                     num_tokenprob += 1
-                    continue # skip this question/answer pair
+                    continue 
 
                 examples.append((' '.join(context_tokens), ' '.join(question_tokens), ' '.join(ans_tokens), ' '.join([str(ans_start_wordloc), str(ans_end_wordloc)])))
 
