@@ -3,6 +3,7 @@ Reading Comprehension using SQUAD data<br />
 First install the python libraries mentioned in requirements.txt file<br />
 How to run:<br />
 cd squad<br />
+mkdir data<br />
 To download and process the data:<br />
 python code/preprocessing/squad_preprocess.py --data_dir data<br />
 To download GLoVE:<br />
